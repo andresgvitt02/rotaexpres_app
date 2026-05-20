@@ -1,9 +1,17 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 class MapaPage extends StatefulWidget {
-  const MapaPage({super.key});
+  final Map pedido;
+
+  const MapaPage({super.key, required this.pedido});
 
   @override
   State<MapaPage> createState() => _MapaPageState();
@@ -12,47 +20,145 @@ class MapaPage extends StatefulWidget {
 class _MapaPageState extends State<MapaPage> {
   final String googleApiKey = "AIzaSyAFbTV2_V-iYPYinlnWNn6wApvkneRHUbc";
 
-  final LatLng origem = const LatLng(-29.3353, -49.7269); // motoboy
-  final LatLng destino = const LatLng(-29.3400, -49.7200); // coleta
+  final String socketUrl = "http://192.168.3.23:3000";
+
+  GoogleMapController? mapController;
+
+  LatLng? origem;
+  LatLng? destino;
 
   List<LatLng> rota = [];
+
+  StreamSubscription<Position>? positionStream;
+
+  bool recalculandoRota = false;
+
+  bool chegouNaColeta = false;
+
+  bool pedidoColetado = false;
+
+  IO.Socket? socket;
+
+  String tituloMapa = "Indo para coleta";
 
   @override
   void initState() {
     super.initState();
-    buscarRota();
+
+    conectarSocket();
+
+    iniciarMapa();
   }
 
-Future buscarRota() async {
+  void conectarSocket() {
+    socket = IO.io(
+      socketUrl,
+      IO.OptionBuilder()
+          .setTransports(['websocket'])
+          .enableAutoConnect()
+          .build(),
+    );
 
-  PolylinePoints polylinePoints = PolylinePoints(
-    apiKey: googleApiKey,
-  );
+    socket!.connect();
 
-  PolylineResult result =
-      await polylinePoints.getRouteBetweenCoordinates(
+    socket!.onConnect((_) {
+      print("SOCKET CONECTADO");
+    });
 
-    request: PolylineRequest(
+    socket!.onDisconnect((_) {
+      print("SOCKET DESCONECTADO");
+    });
+  }
 
-      origin: PointLatLng(
-        origem.latitude,
-        origem.longitude,
+  Future iniciarMapa() async {
+    await pegarLocalizacaoAtual();
+
+    await carregarDestinoColeta();
+
+    await buscarRota();
+
+    iniciarGPSAoVivo();
+  }
+
+  Future pegarLocalizacaoAtual() async {
+    LocationPermission permission =
+        await Geolocator.checkPermission();
+
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      throw Exception("Permissão negada");
+    }
+
+    Position position =
+        await Geolocator.getCurrentPosition();
+
+    origem = LatLng(
+      position.latitude,
+      position.longitude,
+    );
+  }
+
+  Future carregarDestinoColeta() async {
+    final endereco =
+        widget.pedido["endereco_coleta"];
+
+    await carregarEndereco(endereco);
+  }
+
+  Future carregarDestinoEntrega() async {
+    final endereco =
+        widget.pedido["endereco_entrega"];
+
+    await carregarEndereco(endereco);
+  }
+
+  Future carregarEndereco(String endereco) async {
+    print("ENDEREÇO:");
+    print(endereco);
+
+    final response = await http.get(
+      Uri.parse(
+        "https://maps.googleapis.com/maps/api/geocode/json"
+        "?address=${Uri.encodeComponent(endereco)}"
+        "&key=$googleApiKey",
       ),
+    );
 
-      destination: PointLatLng(
-        destino.latitude,
-        destino.longitude,
+    final data = jsonDecode(response.body);
+
+    final location =
+        data["results"][0]["geometry"]["location"];
+
+    destino = LatLng(
+      location["lat"],
+      location["lng"],
+    );
+  }
+
+  Future buscarRota() async {
+    PolylinePoints polylinePoints =
+        PolylinePoints(apiKey: googleApiKey);
+
+    PolylineResult result =
+        await polylinePoints.getRouteBetweenCoordinates(
+      request: PolylineRequest(
+        origin: PointLatLng(
+          origem!.latitude,
+          origem!.longitude,
+        ),
+        destination: PointLatLng(
+          destino!.latitude,
+          destino!.longitude,
+        ),
+        mode: TravelMode.driving,
       ),
+    );
 
-      mode: TravelMode.driving,
-
-    ),
-  );
-
-  if (result.points.isNotEmpty) {
-
-    setState(() {
-
+    if (result.points.isNotEmpty) {
       rota = result.points
           .map(
             (p) => LatLng(
@@ -62,34 +168,193 @@ Future buscarRota() async {
           )
           .toList();
 
-    });
-
+      setState(() {});
+    }
   }
-}
+
+  Future atualizarRota() async {
+    if (origem == null) return;
+
+    if (destino == null) return;
+
+    if (recalculandoRota) return;
+
+    recalculandoRota = true;
+
+    try {
+      await buscarRota();
+    } catch (e) {
+      print("ERRO ROTA:");
+      print(e);
+    }
+
+    recalculandoRota = false;
+  }
+
+  Future verificarChegada() async {
+    if (origem == null || destino == null) return;
+
+    if (pedidoColetado) return;
+
+    double distancia = Geolocator.distanceBetween(
+      origem!.latitude,
+      origem!.longitude,
+      destino!.latitude,
+      destino!.longitude,
+    );
+
+    print("DISTÂNCIA:");
+    print(distancia);
+
+    if (distancia < 50 && !chegouNaColeta) {
+      chegouNaColeta = true;
+
+      print("MOTOBOY CHEGOU NA COLETA");
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Você chegou na coleta",
+            ),
+          ),
+        );
+      }
+
+      setState(() {});
+    }
+  }
+
+  Future confirmarColeta() async {
+    pedidoColetado = true;
+
+    tituloMapa = "Indo para entrega";
+
+    await carregarDestinoEntrega();
+
+    await buscarRota();
+
+    setState(() {});
+  }
+
+  void iniciarGPSAoVivo() {
+    positionStream =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.best,
+            distanceFilter: 10,
+          ),
+        ).listen(
+      (Position position) async {
+
+        origem = LatLng(
+          position.latitude,
+          position.longitude,
+        );
+
+        socket?.emit(
+          "localizacao",
+          {
+            "latitude": position.latitude,
+            "longitude": position.longitude,
+          },
+        );
+
+        print("LOCALIZAÇÃO ENVIADA");
+
+        mapController?.animateCamera(
+          CameraUpdate.newLatLng(origem!),
+        );
+
+        await atualizarRota();
+
+        await verificarChegada();
+
+        setState(() {});
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    positionStream?.cancel();
+
+    socket?.dispose();
+
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (origem == null || destino == null) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
-      appBar: AppBar(title: const Text("Indo para coleta")),
+      appBar: AppBar(
+        title: Text(tituloMapa),
+      ),
 
-      body: GoogleMap(
-        initialCameraPosition: CameraPosition(target: origem, zoom: 14),
+      body: Stack(
+        children: [
 
-        myLocationEnabled: true,
+          GoogleMap(
+            onMapCreated: (controller) {
+              mapController = controller;
+            },
 
-        markers: {
-          Marker(markerId: const MarkerId("origem"), position: origem),
+            initialCameraPosition: CameraPosition(
+              target: origem!,
+              zoom: 15,
+            ),
 
-          Marker(markerId: const MarkerId("destino"), position: destino),
-        },
+            myLocationEnabled: true,
 
-        polylines: {
-          Polyline(
-            polylineId: const PolylineId("rota"),
-            points: rota,
-            width: 5,
+            markers: {
+              Marker(
+                markerId: const MarkerId("motoboy"),
+                position: origem!,
+              ),
+
+              Marker(
+                markerId: const MarkerId("destino"),
+                position: destino!,
+              ),
+            },
+
+            polylines: {
+              Polyline(
+                polylineId: const PolylineId("rota"),
+                points: rota,
+                width: 5,
+              ),
+            },
           ),
-        },
+
+          if (chegouNaColeta && !pedidoColetado)
+            Positioned(
+              bottom: 30,
+              left: 20,
+              right: 20,
+
+              child: ElevatedButton(
+                onPressed: confirmarColeta,
+
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.all(18),
+                ),
+
+                child: const Text(
+                  "CONFIRMAR COLETA",
+                  style: TextStyle(fontSize: 18),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

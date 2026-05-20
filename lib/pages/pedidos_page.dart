@@ -12,7 +12,6 @@ class PedidosPage extends StatefulWidget {
 }
 
 class _PedidosPageState extends State<PedidosPage> {
-
   List pedidos = [];
   final locationService = LocationService();
 
@@ -31,22 +30,18 @@ class _PedidosPageState extends State<PedidosPage> {
   }
 
   Future aceitarPedido(int id, int index) async {
-
     final response = await ApiService.aceitarPedido(id, 2);
 
     locationService.iniciar();
 
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => const MapaPage(),
-      ),
+      MaterialPageRoute(builder: (context) => MapaPage(pedido: response)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       appBar: AppBar(
         title: const Text("Pedidos Disponíveis"),
@@ -56,11 +51,7 @@ class _PedidosPageState extends State<PedidosPage> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Color(0xFF1e3a5f),
-              Color(0xFF2d4a6f),
-              Color(0xFF1a2f4a),
-            ],
+            colors: [Color(0xFF1e3a5f), Color(0xFF2d4a6f), Color(0xFF1a2f4a)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -76,7 +67,6 @@ class _PedidosPageState extends State<PedidosPage> {
             : ListView.builder(
                 itemCount: pedidos.length,
                 itemBuilder: (context, index) {
-
                   final pedido = pedidos[index];
 
                   return Padding(
@@ -94,7 +84,6 @@ class _PedidosPageState extends State<PedidosPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-
                             // Coleta
                             Row(
                               children: const [
@@ -102,9 +91,7 @@ class _PedidosPageState extends State<PedidosPage> {
                                 SizedBox(width: 8),
                                 Text(
                                   "Coleta",
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                  style: TextStyle(fontWeight: FontWeight.bold),
                                 ),
                               ],
                             ),
@@ -122,9 +109,7 @@ class _PedidosPageState extends State<PedidosPage> {
                                 SizedBox(width: 8),
                                 Text(
                                   "Entrega",
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                  style: TextStyle(fontWeight: FontWeight.bold),
                                 ),
                               ],
                             ),
@@ -138,7 +123,10 @@ class _PedidosPageState extends State<PedidosPage> {
                             // Valor
                             Row(
                               children: [
-                                const Icon(Icons.attach_money, color: Colors.green),
+                                const Icon(
+                                  Icons.attach_money,
+                                  color: Colors.green,
+                                ),
                                 const SizedBox(width: 8),
                                 Text(
                                   "R\$ ${pedido["valor_entrega"]}",
@@ -161,7 +149,9 @@ class _PedidosPageState extends State<PedidosPage> {
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFFff6b1a),
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10),
                                   ),
@@ -172,7 +162,6 @@ class _PedidosPageState extends State<PedidosPage> {
                                 ),
                               ),
                             ),
-
                           ],
                         ),
                       ),
