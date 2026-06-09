@@ -11,16 +11,22 @@ import 'package:socket_io_client/socket_io_client.dart' as IO;
 class MapaPage extends StatefulWidget {
   final Map pedido;
 
-  const MapaPage({super.key, required this.pedido});
+  const MapaPage({
+    super.key,
+    required this.pedido,
+  });
 
   @override
   State<MapaPage> createState() => _MapaPageState();
 }
 
 class _MapaPageState extends State<MapaPage> {
-  final String googleApiKey = "AIzaSyAFbTV2_V-iYPYinlnWNn6wApvkneRHUbc";
 
-  final String socketUrl = "http://192.168.3.23:3000";
+  final String googleApiKey =
+      "AIzaSyAFbTV2_V-iYPYinlnWNn6wApvkneRHUbc";
+
+  final String socketUrl =
+      "http://172.29.0.133:3000";
 
   GoogleMapController? mapController;
 
@@ -31,15 +37,20 @@ class _MapaPageState extends State<MapaPage> {
 
   StreamSubscription<Position>? positionStream;
 
+  IO.Socket? socket;
+
   bool recalculandoRota = false;
 
   bool chegouNaColeta = false;
 
   bool pedidoColetado = false;
 
-  IO.Socket? socket;
+  bool chegouNaEntrega = false;
 
-  String tituloMapa = "Indo para coleta";
+  bool pedidoFinalizado = false;
+
+  String tituloMapa =
+      "Indo para coleta";
 
   @override
   void initState() {
@@ -51,10 +62,13 @@ class _MapaPageState extends State<MapaPage> {
   }
 
   void conectarSocket() {
+
     socket = IO.io(
       socketUrl,
       IO.OptionBuilder()
-          .setTransports(['websocket'])
+          .setTransports(
+            ['websocket'],
+          )
           .enableAutoConnect()
           .build(),
     );
@@ -62,15 +76,22 @@ class _MapaPageState extends State<MapaPage> {
     socket!.connect();
 
     socket!.onConnect((_) {
-      print("SOCKET CONECTADO");
+
+      print(
+        "SOCKET CONECTADO",
+      );
     });
 
     socket!.onDisconnect((_) {
-      print("SOCKET DESCONECTADO");
+
+      print(
+        "SOCKET DESCONECTADO",
+      );
     });
   }
 
   Future iniciarMapa() async {
+
     await pegarLocalizacaoAtual();
 
     await carregarDestinoColeta();
@@ -81,20 +102,32 @@ class _MapaPageState extends State<MapaPage> {
   }
 
   Future pegarLocalizacaoAtual() async {
+
     LocationPermission permission =
         await Geolocator.checkPermission();
 
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+    if (permission ==
+        LocationPermission.denied) {
+
+      permission =
+          await Geolocator
+              .requestPermission();
     }
 
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
-      throw Exception("Permissão negada");
+    if (permission ==
+            LocationPermission.denied ||
+        permission ==
+            LocationPermission
+                .deniedForever) {
+
+      throw Exception(
+        "Permissão negada",
+      );
     }
 
     Position position =
-        await Geolocator.getCurrentPosition();
+        await Geolocator
+            .getCurrentPosition();
 
     origem = LatLng(
       position.latitude,
@@ -103,24 +136,33 @@ class _MapaPageState extends State<MapaPage> {
   }
 
   Future carregarDestinoColeta() async {
-    final endereco =
-        widget.pedido["endereco_coleta"];
 
-    await carregarEndereco(endereco);
+    final endereco =
+        widget.pedido[
+            "endereco_coleta"];
+
+    await carregarEndereco(
+      endereco,
+    );
   }
 
   Future carregarDestinoEntrega() async {
-    final endereco =
-        widget.pedido["endereco_entrega"];
 
-    await carregarEndereco(endereco);
+    final endereco =
+        widget.pedido[
+            "endereco_entrega"];
+
+    await carregarEndereco(
+      endereco,
+    );
   }
 
-  Future carregarEndereco(String endereco) async {
-    print("ENDEREÇO:");
-    print(endereco);
+  Future carregarEndereco(
+    String endereco,
+  ) async {
 
-    final response = await http.get(
+    final response =
+        await http.get(
       Uri.parse(
         "https://maps.googleapis.com/maps/api/geocode/json"
         "?address=${Uri.encodeComponent(endereco)}"
@@ -128,10 +170,20 @@ class _MapaPageState extends State<MapaPage> {
       ),
     );
 
-    final data = jsonDecode(response.body);
+    final data =
+        jsonDecode(response.body);
+
+    if (data["results"] == null ||
+        data["results"].isEmpty) {
+
+      throw Exception(
+        "Endereço não encontrado",
+      );
+    }
 
     final location =
-        data["results"][0]["geometry"]["location"];
+        data["results"][0]
+            ["geometry"]["location"];
 
     destino = LatLng(
       location["lat"],
@@ -140,11 +192,15 @@ class _MapaPageState extends State<MapaPage> {
   }
 
   Future buscarRota() async {
+
     PolylinePoints polylinePoints =
-        PolylinePoints(apiKey: googleApiKey);
+        PolylinePoints(
+      apiKey: googleApiKey,
+    );
 
     PolylineResult result =
-        await polylinePoints.getRouteBetweenCoordinates(
+        await polylinePoints
+            .getRouteBetweenCoordinates(
       request: PolylineRequest(
         origin: PointLatLng(
           origem!.latitude,
@@ -159,6 +215,7 @@ class _MapaPageState extends State<MapaPage> {
     );
 
     if (result.points.isNotEmpty) {
+
       rota = result.points
           .map(
             (p) => LatLng(
@@ -173,6 +230,7 @@ class _MapaPageState extends State<MapaPage> {
   }
 
   Future atualizarRota() async {
+
     if (origem == null) return;
 
     if (destino == null) return;
@@ -182,9 +240,11 @@ class _MapaPageState extends State<MapaPage> {
     recalculandoRota = true;
 
     try {
+
       await buscarRota();
+
     } catch (e) {
-      print("ERRO ROTA:");
+
       print(e);
     }
 
@@ -192,43 +252,71 @@ class _MapaPageState extends State<MapaPage> {
   }
 
   Future verificarChegada() async {
-    if (origem == null || destino == null) return;
 
-    if (pedidoColetado) return;
+    if (origem == null ||
+        destino == null) return;
 
-    double distancia = Geolocator.distanceBetween(
+    double distancia =
+        Geolocator.distanceBetween(
       origem!.latitude,
       origem!.longitude,
       destino!.latitude,
       destino!.longitude,
     );
 
-    print("DISTÂNCIA:");
-    print(distancia);
+    print(
+      "DISTÂNCIA: $distancia",
+    );
 
-    if (distancia < 50 && !chegouNaColeta) {
+    // CHEGOU NA COLETA
+    if (!pedidoColetado &&
+        distancia < 50 &&
+        !chegouNaColeta) {
+
       chegouNaColeta = true;
 
-      print("MOTOBOY CHEGOU NA COLETA");
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              "Você chegou na coleta",
-            ),
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Você chegou na coleta",
           ),
-        );
-      }
+        ),
+      );
+
+      setState(() {});
+    }
+
+    // CHEGOU NA ENTREGA
+    if (pedidoColetado &&
+        distancia < 50 &&
+        !chegouNaEntrega) {
+
+      chegouNaEntrega = true;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Você chegou na entrega",
+          ),
+        ),
+      );
 
       setState(() {});
     }
   }
 
   Future confirmarColeta() async {
+
     pedidoColetado = true;
 
-    tituloMapa = "Indo para entrega";
+    tituloMapa =
+        "Indo para entrega";
+
+    chegouNaColeta = false;
 
     await carregarDestinoEntrega();
 
@@ -237,15 +325,54 @@ class _MapaPageState extends State<MapaPage> {
     setState(() {});
   }
 
-  void iniciarGPSAoVivo() {
-    positionStream =
-        Geolocator.getPositionStream(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.best,
-            distanceFilter: 10,
+  Future finalizarPedido() async {
+
+    final pedidoId =
+        widget.pedido["id"];
+
+    try {
+
+      await http.put(
+        Uri.parse(
+          "$socketUrl/pedidos/$pedidoId/concluir",
+        ),
+      );
+
+      pedidoFinalizado = true;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Pedido finalizado",
           ),
-        ).listen(
-      (Position position) async {
+        ),
+      );
+
+      Navigator.pop(context);
+
+    } catch (e) {
+
+      print(e);
+    }
+  }
+
+  void iniciarGPSAoVivo() {
+
+    positionStream =
+        Geolocator
+            .getPositionStream(
+      locationSettings:
+          const LocationSettings(
+        accuracy:
+            LocationAccuracy.best,
+        distanceFilter: 10,
+      ),
+    ).listen(
+      (
+        Position position,
+      ) async {
 
         origem = LatLng(
           position.latitude,
@@ -255,15 +382,26 @@ class _MapaPageState extends State<MapaPage> {
         socket?.emit(
           "localizacao",
           {
-            "latitude": position.latitude,
-            "longitude": position.longitude,
+            "pedidoId":
+                widget.pedido["id"],
+
+            "latitude":
+                position.latitude,
+
+            "longitude":
+                position.longitude,
           },
         );
 
-        print("LOCALIZAÇÃO ENVIADA");
+        print(
+          "LOCALIZAÇÃO ENVIADA",
+        );
 
-        mapController?.animateCamera(
-          CameraUpdate.newLatLng(origem!),
+        mapController
+            ?.animateCamera(
+          CameraUpdate.newLatLng(
+            origem!,
+          ),
         );
 
         await atualizarRota();
@@ -277,6 +415,7 @@ class _MapaPageState extends State<MapaPage> {
 
   @override
   void dispose() {
+
     positionStream?.cancel();
 
     socket?.dispose();
@@ -285,72 +424,120 @@ class _MapaPageState extends State<MapaPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    if (origem == null || destino == null) {
+  Widget build(
+    BuildContext context,
+  ) {
+
+    if (origem == null ||
+        destino == null) {
+
       return const Scaffold(
         body: Center(
-          child: CircularProgressIndicator(),
+          child:
+              CircularProgressIndicator(),
         ),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(tituloMapa),
+        title: Text(
+          tituloMapa,
+        ),
       ),
 
       body: Stack(
         children: [
 
           GoogleMap(
-            onMapCreated: (controller) {
-              mapController = controller;
+            onMapCreated:
+                (controller) {
+
+              mapController =
+                  controller;
             },
 
-            initialCameraPosition: CameraPosition(
+            initialCameraPosition:
+                CameraPosition(
               target: origem!,
               zoom: 15,
             ),
 
-            myLocationEnabled: true,
+            myLocationEnabled:
+                true,
 
             markers: {
+
               Marker(
-                markerId: const MarkerId("motoboy"),
+                markerId:
+                    const MarkerId(
+                  "motoboy",
+                ),
+
                 position: origem!,
               ),
 
               Marker(
-                markerId: const MarkerId("destino"),
+                markerId:
+                    const MarkerId(
+                  "destino",
+                ),
+
                 position: destino!,
               ),
             },
 
             polylines: {
+
               Polyline(
-                polylineId: const PolylineId("rota"),
+                polylineId:
+                    const PolylineId(
+                  "rota",
+                ),
+
                 points: rota,
+
                 width: 5,
               ),
             },
           ),
 
-          if (chegouNaColeta && !pedidoColetado)
+          // BOTÃO COLETA
+          if (chegouNaColeta &&
+              !pedidoColetado)
+
             Positioned(
               bottom: 30,
               left: 20,
               right: 20,
 
-              child: ElevatedButton(
-                onPressed: confirmarColeta,
-
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.all(18),
-                ),
+              child:
+                  ElevatedButton(
+                onPressed:
+                    confirmarColeta,
 
                 child: const Text(
                   "CONFIRMAR COLETA",
-                  style: TextStyle(fontSize: 18),
+                ),
+              ),
+            ),
+
+          // BOTÃO FINALIZAR
+          if (chegouNaEntrega &&
+              !pedidoFinalizado)
+
+            Positioned(
+              bottom: 90,
+              left: 20,
+              right: 20,
+
+              child:
+                  ElevatedButton(
+                onPressed:
+                    finalizarPedido,
+
+                child: const Text(
+                  "FINALIZAR ENTREGA",
                 ),
               ),
             ),

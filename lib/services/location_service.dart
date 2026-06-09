@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:geolocator/geolocator.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 
@@ -6,39 +7,113 @@ class LocationService {
 
   late IO.Socket socket;
 
-  void iniciar() async {
+  StreamSubscription<Position>? positionStream;
 
-    // 🔌 conecta no backend
+  // IP DO SEU PC
+  final String socketUrl =
+      "http://172.29.0.133:3000";
+
+  void iniciar({
+    required int pedidoId,
+  }) async {
+
     socket = IO.io(
-      'http://localhost:3000',
+      socketUrl,
       IO.OptionBuilder()
-        .setTransports(['websocket'])
-        .build(),
+          .setTransports(
+            ['websocket'],
+          )
+          .enableAutoConnect()
+          .build(),
     );
 
     socket.connect();
 
     socket.onConnect((_) {
-      print("Conectado ao socket 🔥");
+
+      print(
+        "SOCKET CONECTADO",
+      );
     });
 
-    // 📍 pega localização continuamente
-    Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
+    socket.onDisconnect((_) {
+
+      print(
+        "SOCKET DESCONECTADO",
+      );
+    });
+
+    LocationPermission permission =
+        await Geolocator.checkPermission();
+
+    if (permission ==
+        LocationPermission.denied) {
+
+      permission =
+          await Geolocator
+              .requestPermission();
+    }
+
+    if (permission ==
+            LocationPermission.denied ||
+        permission ==
+            LocationPermission
+                .deniedForever) {
+
+      print(
+        "PERMISSÃO NEGADA",
+      );
+
+      return;
+    }
+
+    positionStream =
+        Geolocator
+            .getPositionStream(
+      locationSettings:
+          const LocationSettings(
+        accuracy:
+            LocationAccuracy.best,
         distanceFilter: 10,
       ),
-    ).listen((Position position) {
+    ).listen(
+      (
+        Position position,
+      ) {
 
-      print("Enviando localização: ${position.latitude}, ${position.longitude}");
+        print(
+          "ENVIANDO LOCALIZAÇÃO",
+        );
 
-      socket.emit("localizacao", {
-        "pedido_id": 1, // depois vamos deixar dinâmico
-        "lat": position.latitude,
-        "lng": position.longitude
-      });
+        print(
+          position.latitude,
+        );
 
-    });
+        print(
+          position.longitude,
+        );
 
+        socket.emit(
+          "localizacao",
+          {
+            "pedidoId":
+                pedidoId,
+
+            "latitude":
+                position.latitude,
+
+            "longitude":
+                position.longitude,
+          },
+        );
+      },
+    );
+  }
+
+  void parar() {
+
+    positionStream?.cancel();
+
+    socket.dispose();
   }
 }
