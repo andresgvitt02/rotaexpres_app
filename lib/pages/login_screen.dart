@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'pedidos_page.dart';
+import 'register_screen.dart'; 
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -10,43 +11,35 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-
   final emailController = TextEditingController();
   final senhaController = TextEditingController();
 
   void _handleLogin() async {
-
     var response = await ApiService.login(
       emailController.text,
       senhaController.text,
     );
 
     if (response["user"] != null && response["user"]["tipo"] == "motoboy") {
-
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (context) => const PedidosPage(),
         ),
       );
-
     } else {
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Acesso permitido apenas para motoboy")),
       );
-
     }
   }
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       body: Container(
         width: double.infinity,
         height: double.infinity,
-
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [
@@ -58,24 +51,20 @@ class _LoginScreenState extends State<LoginScreen> {
             end: Alignment.bottomRight,
           ),
         ),
-
         child: Center(
-          child: Padding(
+          // 🔥 Adicionado SingleChildScrollView para o teclado do celular não bugar a tela
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
-
             child: Card(
               elevation: 8,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
-
               child: Padding(
                 padding: const EdgeInsets.all(24),
-
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-
                     const Text(
                       "RotaEXPRESS",
                       style: TextStyle(
@@ -84,16 +73,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         color: Color(0xFF1e3a5f),
                       ),
                     ),
-
                     const SizedBox(height: 10),
-
                     const Text(
                       "Login do Motoboy",
                       style: TextStyle(color: Colors.grey),
                     ),
-
                     const SizedBox(height: 20),
-
+                    
                     TextField(
                       controller: emailController,
                       decoration: InputDecoration(
@@ -104,9 +90,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 16),
-
+                    
                     TextField(
                       controller: senhaController,
                       obscureText: true,
@@ -118,9 +103,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 20),
-
+                    
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
@@ -131,8 +115,25 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         child: const Text(
                           "Entrar",
-                          style: TextStyle(fontSize: 16),
+                          style: TextStyle(fontSize: 16, color: Colors.white),
                         ),
+                      ),
+                    ),
+
+                    // 🔥 NOVO: Botão que leva para a tela de registro
+                    const SizedBox(height: 10),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const RegisterScreen(),
+                          ),
+                        );
+                      },
+                      child: const Text(
+                        "Não tem uma conta? Registre-se",
+                        style: TextStyle(color: Color(0xFF1e3a5f)),
                       ),
                     ),
 

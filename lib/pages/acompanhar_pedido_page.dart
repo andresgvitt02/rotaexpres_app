@@ -16,7 +16,7 @@ class _AcompanharPedidoPageState
     extends State<AcompanharPedidoPage> {
 
   final String socketUrl =
-      "http://172.29.0.133:3000";
+      "http://192.168.3.23:3000";
 
   GoogleMapController? mapController;
 

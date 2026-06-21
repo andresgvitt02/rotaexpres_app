@@ -11,7 +11,7 @@ class LocationService {
 
   // IP DO SEU PC
   final String socketUrl =
-      "http://172.29.0.133:3000";
+      "http://192.168.3.23:3000";
 
   void iniciar({
     required int pedidoId,

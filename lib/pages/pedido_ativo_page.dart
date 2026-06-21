@@ -69,7 +69,7 @@ class PedidoAtivoPage extends StatelessWidget {
 
                     try {
                       // Usando o IP da sua rede local atual
-                      final url = Uri.parse('http://172.29.0.133:3000/pedidos/$pedidoId/concluir');
+                      final url = Uri.parse('http://192.168.3.23:3000/pedidos/$pedidoId/concluir');
                       
                       final response = await http.put(
                         url,
